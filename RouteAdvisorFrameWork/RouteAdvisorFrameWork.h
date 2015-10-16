@@ -7,6 +7,8 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
+
 
 //! Project version number for RouteAdvisorFrameWork.
 FOUNDATION_EXPORT double RouteAdvisorFrameWorkVersionNumber;
@@ -15,5 +17,4 @@ FOUNDATION_EXPORT double RouteAdvisorFrameWorkVersionNumber;
 FOUNDATION_EXPORT const unsigned char RouteAdvisorFrameWorkVersionString[];
 
 // In this header, you should import all the public headers of your framework using statements like #import <RouteAdvisorFrameWork/PublicHeader.h>
-
 
