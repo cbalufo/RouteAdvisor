@@ -294,7 +294,7 @@
 
 /*!
  @interface TRANSPORT
- @discussion Objecte que conté l’informació d'una parada de transport
+ @discussion Objecte que conté l’informació d'un transport
  <ul>
  <li>@field
  <b>idSTOP</b>

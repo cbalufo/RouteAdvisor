@@ -180,9 +180,7 @@
 -(void) isVisited:(BOOL) vis {
     visited = vis;
 }
-//-(void) setRating:(long) rat{
-//    rating = rat;
-//}
+
 @end
 
 
@@ -306,7 +304,16 @@
 #define TYPE_CAT_ART_SCORE @"cat_art_score"
 #define TYPE_CAT_LEISURE_SCORE @"cat_leisure_score"
 #define TYPE_CAT_SHOOPING_SCORE @"cat_shopping_score"
+#define TYPE_EDGE_POI_TOPIC @"poi_topic"
+//top solver params
+#define MAX_DAYS ((int) 5)
+#define MIN_DAYS ((int) 1)
 
+#define FAST_SPEED ((double) 83.3)
+#define NORMAL_SPEED ((double) 66.6)
+#define RELAXED_SPEED ((double) 50)
+
+#define DEFAULT_DOUBLE_VALUE ((double) 0.0)
 
 -(NSMutableArray *) getAllFixRoute{
     NSString *sparkseeOK = [UtilsGraph prepareDataBaseSparksee];
@@ -330,18 +337,18 @@
     STSValue *valueDescription = [[STSValue alloc] init];
     STSValue *valuePoiOrder = [[STSValue alloc] init];
     STSValue *valueCoordPoiCenter = [[STSValue alloc] init];
-    STSValue *vTopic = [[STSValue alloc] init];
-    STSValue *vNeighbourhood = [[STSValue alloc] init];
+    //STSValue *vTopic = [[STSValue alloc] init];
+    //STSValue *vNeighbourhood = [[STSValue alloc] init];
 
     int fixRouteType = [graph findType: TYPE_FIXROUTE];
     int routeIdType = [graph findAttribute:fixRouteType name:TYPE_ID];
     int routeDescriptionType = [graph findAttribute:fixRouteType name:TYPE_DESCRIPTION];
     int routePoiOrderType = [graph findAttribute:fixRouteType name:TYPE_POI_ORDER];
     int routeCoordPoiCenterType = [graph findAttribute:fixRouteType name:TYPE_COORD_POICENTER];
-    int edgeTopicFixRouteType = [graph findType: TYPE_TOPIC_FIXROUTE];
-    int edgeNeighbourhoodFixRouteType = [graph findType: TYPE_NEIGHBOURHOOD_FIXROUTE];
-    int neighbourhoodType = [graph findType: TYPE_NEIGHBOURHOOD];
-    int topicType = [graph findType: TYPE_TOPIC];
+    //int edgeTopicFixRouteType = [graph findType: TYPE_TOPIC_FIXROUTE];
+    //int edgeNeighbourhoodFixRouteType = [graph findType: TYPE_NEIGHBOURHOOD_FIXROUTE];
+    //int neighbourhoodType = [graph findType: TYPE_NEIGHBOURHOOD];
+    //int topicType = [graph findType: TYPE_TOPIC];
 
     STSObjects *route = [graph selectWithType: fixRouteType];
     
@@ -355,7 +362,7 @@
         [graph getAttributeInValue: fixRouteOid attr: routeDescriptionType value: valueDescription];
         [graph getAttributeInValue: fixRouteOid attr: routePoiOrderType value: valuePoiOrder];
         [graph getAttributeInValue: fixRouteOid attr: routeCoordPoiCenterType value: valueCoordPoiCenter];
-
+/*
         STSObjects *topics = [graph neighbors: fixRouteOid etype: edgeTopicFixRouteType dir: STSAny];
         STSObjectsIterator *itTopics = [topics iterator];
         while ([itTopics hasNext])
@@ -375,7 +382,7 @@
         }
         [itnei close];
         [neis close];
-        
+  */
         FixRoute *r = [[FixRoute alloc] init];
         [ r setDescription:[valueDescription getString]];
         [ r setIdRoute:[valueId getLong]];
@@ -425,6 +432,7 @@
     int edgeType = [graph findType: TYPE_POI_FIXROUTE];
     STSObjectsIterator *itr = [nodeFixRoute iterator];
     
+    
     while ([itr hasNext])
     {
         long long fixRouteOid = [itr next];
@@ -433,14 +441,14 @@
         STSValue *v = [[STSValue alloc] init];
         
         STSObjectsIterator *it = [pois iterator];
-        
+        //get all POI type poi
         while ([it hasNext])
         {
             long long poi = [it next];
             POISimple *p = [[POISimple alloc] init];
             [graph getAttributeInValue: poi attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
             if (!v.isNull){
-                [p setIdPOI:[v getString]];
+                [p setIdPOI:[NSString stringWithFormat:@"%lld", [v getLong]]];
             }
             [graph getAttributeInValue: poi attr: [graph findAttribute:poiType name:TYPE_CLOSEST_POI] value: v];
             if (!v.isNull){
@@ -463,6 +471,7 @@
         
         STSObjectsIterator *itStops = [stops iterator];
         
+        //get all POI type STOPS
         while ([itStops hasNext])
         {
             long long stop = [itStops next];
@@ -494,6 +503,7 @@
     [db close];
     [sparksee close];
     
+    //retun all POI (with type poi and type stops)
     return allPOI;
 }
 
@@ -536,7 +546,7 @@
         STSValue *v = [[STSValue alloc] init];
         
         STSObjectsIterator *it = [pois iterator];
-        
+        //get all POI type poi
         while ([it hasNext])
         {
             long long poi = [it next];
@@ -600,7 +610,7 @@
         STSValue *val = [[STSValue alloc] init];
         
         STSObjectsIterator *itStops = [stops iterator];
-        
+         //get all POI type STOPS
         while ([itStops hasNext])
         {
             long long stop = [itStops next];
@@ -631,7 +641,7 @@
     [sess close];
     [db close];
     [sparksee close];
-    
+    //retun all POI (with type poi and type stops)
     return allPOI;
 }
 
@@ -649,6 +659,30 @@
                                          :(int) days
                                          :(int) rate;
 {
+    // Only accept rutes between 1 to 5 days
+    if (days>MAX_DAYS) {
+        days = MAX_DAYS;
+    }else if (days<MIN_DAYS) {
+        days = MIN_DAYS;
+    }
+    
+    // create the relation between the parameter rate and the speed m/min
+    double speed = NORMAL_SPEED;
+    
+    switch (rate) {
+        case 1:
+            speed = RELAXED_SPEED;
+            break;
+        case 2:
+            speed = NORMAL_SPEED;
+            break;
+        case 3:
+            speed = FAST_SPEED;
+            break;
+        default:
+            break;
+    }
+    
     
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
@@ -669,13 +703,14 @@
     NSMutableArray *dinamicRoutes = [[NSMutableArray alloc] init];
     
     int poiType = [graph findType: TYPE_POI];
+    int edgeTopicType = [graph findType: TYPE_EDGE_POI_TOPIC];
+    int topicType = [graph findType: TYPE_TOPIC];
     
     STSValue *v = [[STSValue alloc] init];
     
-    
+    //get all node POIS in DB
     NSMutableArray *pois = [[NSMutableArray alloc] init];
-
-    //recuperamos todos los poi de la bd
+    
     STSObjects *poiSparksee = [graph selectWithType: poiType];
     
     STSObjectsIterator *it = [poiSparksee iterator];
@@ -684,118 +719,110 @@
     {
         long long obj = [it next];
         long idP ;
-        double lat,lng,arch_score,art_score,leisure_score,museum_score,shooping_score;
         
-        //NSLog(@"step 00");
+        double lat = DEFAULT_DOUBLE_VALUE;
+        double lng = DEFAULT_DOUBLE_VALUE;
+        double arch_score = DEFAULT_DOUBLE_VALUE;
+        double art_score = DEFAULT_DOUBLE_VALUE;
+        double leisure_score= DEFAULT_DOUBLE_VALUE;
+        double museum_score= DEFAULT_DOUBLE_VALUE;
+        double shooping_score= DEFAULT_DOUBLE_VALUE;
         
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
-        if (!v.isNull){
-            idP = [v getLong];
-        }
-        //NSLog(@"step 01 %ld",idP);
+        STSObjects *topic = [graph neighbors: obj etype: edgeTopicType dir: STSAny];
         
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LAT] value: v];
-        if (!v.isNull){
-            lat = [v getDouble];
-        }
-        //NSLog(@"step 02 %f",lat);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LNG] value: v];
-        if (!v.isNull){
-            lng = [v getDouble];
-        }
-        //NSLog(@"step 03 %f",lng);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_ARCH_SCORE] value: v];
-        if (!v.isNull){
-            arch_score = [v getDouble];
-        }
-       // NSLog(@"step 04 %f",arch_score);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_ART_SCORE] value: v];
-        if (!v.isNull){
-            art_score = [v getDouble];
-        }
-        //NSLog(@"step 05 %f",art_score);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_LEISURE_SCORE] value: v];
-        if (!v.isNull){
-            leisure_score = [v getDouble];
-        }
-        //NSLog(@"step 06 %f",leisure_score);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_MUSEUM_SCORE] value: v];
-        if (!v.isNull){
-            museum_score = [v getDouble];
-        }
-        //NSLog(@"step 07 %f",museum_score);
-        [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_SHOOPING_SCORE] value: v];
-        if (!v.isNull){
-            shooping_score = [v getDouble];
-        }
-        //NSLog(@"step 08 %f",shooping_score);
+        STSObjectsIterator *itTopic = [topic iterator];
         
-        //multiplicamos cada uno de los score de los parametros por su correspondiente score del poi de la bd
-        double totalScore = (arch_score * scoreArchitecture) + (art_score * scoreArt) + (leisure_score * scoreLeisure) + (museum_score * scoreMuseum) + (shooping_score * scoreShooping);
-        //NSLog(@"step 09 %f",totalScore);
-        //dividimos por el número de días de las rutas
-        totalScore = totalScore / days;
-        //NSLog(@"step 10 %f",totalScore);
+        long idTopic = 0;
+        while ([itTopic hasNext])
+        {
+            long long objTopic = [itTopic next];
         
-        //guardamos el score en el nuevo POI , dejamos por defecto 45 minutos para cada punto de visita
-        [pois addObject:[[Poi alloc] initWithPoiId:[NSString stringWithFormat: @"%ld", idP] lat:lat lng:lng score:totalScore consumingBudget:45]];
+            [graph getAttributeInValue: objTopic attr: [graph findAttribute:topicType name:TYPE_ID] value: v];
+            if (!v.isNull){
+                idTopic = [v getLong];
+            }
+        }
+        [itTopic close];
+        [topic close];
+        //only work with POI type Museum(2), Architecture(3), Art(4), Leisure(5) and Shooping(8)
+        if ((idTopic == 2) || (idTopic == 3) || (idTopic == 4) || (idTopic == 5) || (idTopic == 8987)) {
         
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
+            if (!v.isNull){
+                idP = [v getLong];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LAT] value: v];
+            if (!v.isNull){
+                lat = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LNG] value: v];
+            if (!v.isNull){
+                lng = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_ARCH_SCORE] value: v];
+            if (!v.isNull){
+                arch_score = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_ART_SCORE] value: v];
+            if (!v.isNull){
+                art_score = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_LEISURE_SCORE] value: v];
+            if (!v.isNull){
+                leisure_score = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_MUSEUM_SCORE] value: v];
+            if (!v.isNull){
+                museum_score = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_CAT_SHOOPING_SCORE] value: v];
+            if (!v.isNull){
+                shooping_score = [v getDouble];
+            }
+            
+            // get total score adding all categories in db with their corresponding form category
+            
+            double totalScore = (arch_score * scoreArchitecture) + (art_score * scoreArt) + (leisure_score * scoreLeisure) + (museum_score * scoreMuseum) + (shooping_score * scoreShooping);
+          
+            //Save the new POI, by default we have 35 minuts for visit each POI
+            [pois addObject:[[Poi alloc] initWithPoiId:[NSString stringWithFormat: @"%ld", idP] lat:lat lng:lng score:totalScore consumingBudget:35]];
+        }
     }
     
     [it close];
     [poiSparksee close];
     
-    //cuando tengamos todos los Poi en la array ordenamos esta por el score
-    //NSLog(@"step 11 count: %lu",(unsigned long)[pois count]);
-    
-    NSSortDescriptor *valueDescriptor = [[NSSortDescriptor alloc] initWithKey:@"score" ascending:YES];
+    //the resultant array is order descendant by score
+    NSSortDescriptor *valueDescriptor = [[NSSortDescriptor alloc] initWithKey:@"score" ascending:NO];
     NSArray *descriptors = [NSArray arrayWithObject:valueDescriptor];
     NSArray *sortedArray = [pois sortedArrayUsingDescriptors:descriptors];
-    //NSLog(@"step 12 count: %lu",(unsigned long)[sortedArray count]);
-    //TODO pasar a número el rate
-    //TODO pasar a número los dias
     
-    //nos quedamos con los 60 primeros poi
-    NSArray *smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, 60)];
-    
-   // NSLog(@"step 13 count: %lu",(unsigned long)[smallArray count]);
-    
+    //Only work with the first 60 POIs
+    NSArray *smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, 200)];
+   
     NSMutableArray *finalPois = [[NSMutableArray alloc] initWithArray:smallArray];
     
-    //NSLog(@"step 14");
+    TopSolver *topSolver = [[TopSolver alloc] initWithRouteCount:(days*2) availableBudget:360.0 walkingSpeed:speed pois:finalPois startLat:latitudeIni startLng:longitudeIni finishLat:latitudeEnd finishLng:longitudeEnd];
     
-    TopSolver *topSolver = [[TopSolver alloc] initWithRouteCount:4 availableBudget:300.0 walkingSpeed:65.0 pois:finalPois startLat:latitudeIni startLng:longitudeIni finishLat:latitudeEnd finishLng:longitudeEnd];
-    
-     //NSLog(@"step 15");
     NSArray *routes = [topSolver run:10 :10];
-    
-    // NSLog(@"step 16 count: %lu",(unsigned long)[routes count]);
-    
-    for (Route *r in routes) {
-        NSString *allpois = [[NSString alloc] init];
-        for (Poi *p in r.pois) {
-                NSString *s = [@"-" stringByAppendingString:p.poiId];
-                allpois = [allpois stringByAppendingString:s];
+
+    //transform each rute in a string with all idPois separated by "-"
+    for (NSMutableArray *d in routes) {
+        NSString *result = [[NSString alloc] init ];
+
+        for (int i=1; i< [d count]-1; i++) {
+            result = [result stringByAppendingString:[d objectAtIndex:i]];
+            if (i<[d count]-2) {
+                result = [result stringByAppendingString:@"-"];
+            }
         }
-        [dinamicRoutes addObject:[allpois substringFromIndex:1]];
-        //NSLog(@"step 17 count: %lu",(unsigned long)[dinamicRoutes count]);
+        [dinamicRoutes addObject:result];
     }
-    
+ 
     [sess close];
     [db close];
     [sparksee close];
-     //NSLog(@"step 18");
-    /* only for test
-    NSMutableArray *test = [[NSMutableArray alloc] init];
-    for (int i=0; i<days; i++) {
-        NSString *l = @"508-1717-509-1419-1718-525-527-524-952-1710-526";
-        [test addObject:l];
-    }
-    NSLog(@"step 18 count: %lu",(unsigned long)[test count]);
-    return test;
-     */
-    
-    
+
     return dinamicRoutes;
     
 }
@@ -1148,7 +1175,5 @@
     
     return p;
 }
-
-
 
 @end
