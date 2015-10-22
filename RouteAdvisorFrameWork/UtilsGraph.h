@@ -11,6 +11,7 @@
 
 
 #endif
+#import <MapKit/MapKit.h>
 
 @interface UtilsGraph : NSObject
 
@@ -33,4 +34,6 @@
                           :(double)latitudeEnd
                           :(double)longitudeEnd;
 
+-(Boolean) isValidCoordenada:(double)latitude :(double)longitude;
+-(double) metresBetweenPlace1:(CLLocationCoordinate2D) place1 andPlace2:(CLLocationCoordinate2D) place2;
 @end

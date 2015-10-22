@@ -27,6 +27,7 @@
 #include "com/graphhopper/util/Translation.h"
 #include "com/graphhopper/util/InstructionAnnotation.h"
 
+
 @interface UtilsGraph ()
 
 @property (weak, nonatomic) MKMapView *mapView;
@@ -230,7 +231,6 @@
                           :(double)longitudeEnd
 {
  //   double *array = [[jdouble alloc] init];
-    
     MKPointAnnotation *point1 = [[MKPointAnnotation alloc] init];
     point1.coordinate = CLLocationCoordinate2DMake(latitudeIni, longitudeIni);
     
@@ -257,6 +257,31 @@
     
     return dist;
 }
+
+-(Boolean) isValidCoordenada:(double)latitude :(double)longitude{
+    double latIni = 41.444436;
+    double latEnd = 41.341800;
+    double lngIni = 2.105443;
+    double lngEnd = 2.255990;
+    
+    if(latitude > latEnd && latitude < latIni && longitude > lngIni && longitude < lngEnd){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+-(double) metresBetweenPlace1:(CLLocationCoordinate2D) place1 andPlace2:(CLLocationCoordinate2D) place2 {
+    
+     MKMapPoint  start, finish;
+        
+     start = MKMapPointForCoordinate(place1);
+     finish = MKMapPointForCoordinate(place2);
+        
+     return MKMetersBetweenMapPoints(start, finish);
+}
+
+
 
 @end
 

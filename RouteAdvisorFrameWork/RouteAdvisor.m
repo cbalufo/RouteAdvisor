@@ -260,6 +260,38 @@
 
 @end
 
+@implementation PoiDistance
+
+-(void) setidP:(NSString *) p {
+    idP = [[NSString alloc]initWithString: p];
+}
+-(NSString *)getidP{
+    return idP;
+}
+
+-(void) setDistance:(double) d {
+    distance = d;
+}
+-(double)getDistance{
+    return distance;
+}
+-(double) getLatitude{
+    return latitude;
+}
+-(void) setLatitude:(double) lat{
+    latitude = lat;
+}
+-(double) getLongitude{
+    return longitude;
+}
+
+-(void) setLongitude:(double) longi{
+    longitude = longi;
+}
+
+
+@end
+
 @interface RouteAdvisor()
 
 @property (nonatomic,strong) UtilsGraph *ug;
@@ -315,8 +347,15 @@
 
 #define DEFAULT_DOUBLE_VALUE ((double) 0.0)
 
+#define TOPIC_RESTAURANT ((int) 6)
+#define TOPIC_MUSEUM ((int) 2)
+#define TOPIC_ART ((int) 4)
+#define TOPIC_ARCHITECTURE ((int) 3)
+#define TOPIC_LEISURE ((int) 5)
+#define TOPIC_SHOOPING ((int) 8)
+
 -(NSMutableArray *) getAllFixRoute{
-    NSString *sparkseeOK = [UtilsGraph prepareDataBaseSparksee];
+   // NSString *sparkseeOK = [UtilsGraph prepareDataBaseSparksee];
     
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
@@ -745,7 +784,7 @@
         [itTopic close];
         [topic close];
         //only work with POI type Museum(2), Architecture(3), Art(4), Leisure(5) and Shooping(8)
-        if ((idTopic == 2) || (idTopic == 3) || (idTopic == 4) || (idTopic == 5) || (idTopic == 8987)) {
+        if ((idTopic == TOPIC_MUSEUM) || (idTopic == TOPIC_ARCHITECTURE) || (idTopic == TOPIC_ART) || (idTopic == TOPIC_LEISURE) || (idTopic == TOPIC_SHOOPING)) {
         
             [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
             if (!v.isNull){
@@ -831,6 +870,7 @@
     UtilsGraph *g =  [[UtilsGraph alloc] init];
     [g initGraph];
     _ug = g;
+    NSString *sparkseeOK = [UtilsGraph prepareDataBaseSparksee];
 }
 
 
@@ -890,7 +930,11 @@
                           :(double)latitudeEnd
                           :(double)longitudeEnd
 {
-    return [_ug getDistancePois:latitudeIni :longitudeIni : latitudeEnd:longitudeEnd];
+    NSLog(@" STEP 1000 %ff, %ff, %ff, %ff ",latitudeIni,longitudeIni,latitudeEnd,longitudeEnd);
+    double lolo = 0.1;
+    lolo = [_ug getDistancePois:latitudeIni :longitudeIni : latitudeEnd :longitudeEnd];
+    NSLog(@" STEP 1001 %ff ",lolo);
+    return lolo;
 }
 
 -(void) setVisited:(NSString *) idRoute{
@@ -1174,6 +1218,264 @@
     [sparksee close];
     
     return p;
+}
+
+
+-(NSMutableArray *) getClosestRestaurants:(double) latitude :(double)longitude :(int)numRestaurant{
+    
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
+    
+    NSString *dbFile = [destinationFolder stringByAppendingString: @"/poi_triangle.gbd"];
+    NSString *logFile = [destinationFolder stringByAppendingString: @"/poi_triangle.log"];
+    
+    
+    STSSparkseeConfig *cfg = [[STSSparkseeConfig alloc] init];
+    [cfg setLogFile: logFile];
+    [cfg setLicense: KEY_SPARKSEE];
+    [cfg setCacheMaxSize: 1024];
+    STSSparksee *sparksee = [[STSSparksee alloc] initWithConfig: cfg];
+    STSDatabase *db = [sparksee open:(dbFile) readOnly:false];
+    STSSession *sess = [db createSession];
+    STSGraph *graph = [sess getGraph];
+    
+    int poiType = [graph findType: TYPE_POI];
+    int edgeTopicType = [graph findType: TYPE_EDGE_POI_TOPIC];
+    int topicType = [graph findType: TYPE_TOPIC];
+    
+    STSValue *v = [[STSValue alloc] init];
+    
+    NSMutableArray *arrayTemp = [[NSMutableArray alloc] init];
+
+    //get all POIs
+    STSObjects *poiSparksee = [graph selectWithType: poiType];
+    
+    STSObjectsIterator *it = [poiSparksee iterator];
+
+    while ([it hasNext])
+    {
+        long long obj = [it next];
+        long idP = 0 ;
+        
+        double lat = DEFAULT_DOUBLE_VALUE;
+        double lng = DEFAULT_DOUBLE_VALUE;
+        
+        
+        STSObjects *topic = [graph neighbors: obj etype: edgeTopicType dir: STSAny];
+        
+        STSObjectsIterator *itTopic = [topic iterator];
+        
+        long idTopic = 0;
+        while ([itTopic hasNext])
+        {
+            long long objTopic = [itTopic next];
+            
+            [graph getAttributeInValue: objTopic attr: [graph findAttribute:topicType name:TYPE_ID] value: v];
+            if (!v.isNull){
+                idTopic = [v getLong];
+            }
+        }
+        [itTopic close];
+        [topic close];
+        
+        //Only needs the restaurant POI (topic=6)
+        if (idTopic == TOPIC_RESTAURANT) {
+            
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
+            if (!v.isNull){
+                idP = [v getLong];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LAT] value: v];
+            if (!v.isNull){
+                lat = [v getDouble];
+            }
+            [graph getAttributeInValue: obj attr: [graph findAttribute:poiType name:TYPE_LNG] value: v];
+            if (!v.isNull){
+                lng = [v getDouble];
+            }
+            
+            if ((lat != DEFAULT_DOUBLE_VALUE) && (lng != DEFAULT_DOUBLE_VALUE) ){
+                // Distance between location and restaurant POI
+                if ([_ug isValidCoordenada:lat :lng]) {
+                
+                    CLLocationCoordinate2D pMap = CLLocationCoordinate2DMake(latitude, longitude);
+                    CLLocationCoordinate2D pDB = CLLocationCoordinate2DMake(lat, lng);
+                    
+                    double dist = [_ug metresBetweenPlace1:pMap andPlace2:pDB];
+                    
+                    PoiDistance *v = [[PoiDistance alloc] init];
+                    [v setDistance:dist];
+                    [v setidP:[NSString stringWithFormat:@"%ld", idP]];
+                    [v setLatitude:lat];
+                    [v setLongitude:lng];
+                    //the result we save in array[PoiDistance]
+                    [arrayTemp addObject:v];
+                    
+                }
+            }
+        }
+    
+    }
+    
+    [it close];
+    [poiSparksee close];
+    
+    [sess close];
+    [db close];
+    [sparksee close];
+    
+
+    // la array resultante la ordenamos por los metros
+    NSSortDescriptor *valueDescriptor = [[NSSortDescriptor alloc] initWithKey:@"distance" ascending:YES];
+    NSArray *descriptors = [NSArray arrayWithObject:valueDescriptor];
+    NSArray *sortedArray = [arrayTemp sortedArrayUsingDescriptors:descriptors];
+    
+    //Only work with the first numStops POIs
+    
+    NSArray *smallArray;
+    
+    if (sortedArray.count>numRestaurant+5) {
+        smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, numRestaurant+5)];
+    }else{
+        smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, numRestaurant)];
+    }
+    
+    NSMutableArray *stops = [[NSMutableArray alloc] init];
+    
+    //aplicamos graphhopper solo para esa array
+    for (PoiDistance *v in smallArray) {
+        
+        double distWalk = [_ug getDistancePois:latitude :longitude :[v getLatitude] :[v getLongitude]];
+        [v setDistance:distWalk];
+        [stops addObject:v];
+    }
+    
+    //ordenar la nueva lista
+    NSArray *stopsOrder = [stops sortedArrayUsingDescriptors:descriptors];
+    NSArray *smallStopArray = [stopsOrder subarrayWithRange:NSMakeRange(0, numRestaurant)];
+    
+    // devolvemos solo los numRestaurant primeros en una array de NSString
+    NSMutableArray *array = [[NSMutableArray alloc] initWithArray:smallStopArray];
+    
+    return array;
+
+}
+
+-(NSMutableArray *) getClosestStops:(double) latitude :(double)longitude :(int)numStops{
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
+    
+    NSString *dbFile = [destinationFolder stringByAppendingString: @"/poi_triangle.gbd"];
+    NSString *logFile = [destinationFolder stringByAppendingString: @"/poi_triangle.log"];
+    
+    
+    STSSparkseeConfig *cfg = [[STSSparkseeConfig alloc] init];
+    [cfg setLogFile: logFile];
+    [cfg setLicense: KEY_SPARKSEE];
+    [cfg setCacheMaxSize: 1024];
+    STSSparksee *sparksee = [[STSSparksee alloc] initWithConfig: cfg];
+    STSDatabase *db = [sparksee open:(dbFile) readOnly:false];
+    STSSession *sess = [db createSession];
+    STSGraph *graph = [sess getGraph];
+    
+    int stopType = [graph findType: TYPE_STOP];
+    
+    STSValue *v = [[STSValue alloc] init];
+    
+    NSMutableArray *arrayTemp = [[NSMutableArray alloc] init];
+
+    //get all STOPs
+    STSObjects *stopsSparksee = [graph selectWithType: stopType];
+    
+    STSObjectsIterator *it = [stopsSparksee iterator];
+    
+    while ([it hasNext])
+    {
+        long long obj = [it next];
+        NSString *idStop = [[NSString alloc] init];
+
+        double lat = DEFAULT_DOUBLE_VALUE;
+        double lng = DEFAULT_DOUBLE_VALUE;
+        
+        [graph getAttributeInValue: obj attr: [graph findAttribute:stopType name:TYPE_ID] value: v];
+        if (!v.isNull){
+            idStop = [v getString];
+        }
+        [graph getAttributeInValue: obj attr: [graph findAttribute:stopType name:TYPE_LAT] value: v];
+        if (!v.isNull){
+            lat = [v getDouble];
+        }
+        [graph getAttributeInValue: obj attr: [graph findAttribute:stopType name:TYPE_LNG] value: v];
+        if (!v.isNull){
+            lng = [v getDouble];
+        }
+
+        if ((lat != DEFAULT_DOUBLE_VALUE) && (lng != DEFAULT_DOUBLE_VALUE) ){
+            
+            
+            if ([_ug isValidCoordenada:lat :lng]) {
+                
+                CLLocationCoordinate2D pMap = CLLocationCoordinate2DMake(latitude, longitude);
+                CLLocationCoordinate2D pDB = CLLocationCoordinate2DMake(lat, lng);
+
+                double dist = [_ug metresBetweenPlace1:pMap andPlace2:pDB];
+                
+                PoiDistance *v = [[PoiDistance alloc] init];
+                [v setDistance:dist];
+                [v setidP:idStop];
+                [v setLatitude:lat];
+                [v setLongitude:lng];
+                //the result we save in array[PoiDistance]
+                [arrayTemp addObject:v];
+                
+            }
+            
+        }
+        
+    }
+
+    [it close];
+    [stopsSparksee close];
+    
+    [sess close];
+    [db close];
+    [sparksee close];
+    
+    // la array resultante la ordenamos por los metros
+    NSSortDescriptor *valueDescriptor = [[NSSortDescriptor alloc] initWithKey:@"distance" ascending:YES];
+    NSArray *descriptors = [NSArray arrayWithObject:valueDescriptor];
+    NSArray *sortedArray = [arrayTemp sortedArrayUsingDescriptors:descriptors];
+    
+    //Only work with the first numStops POIs
+    
+    NSArray *smallArray;
+    
+    if (sortedArray.count>numStops+5) {
+        smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, numStops+5)];
+    }else{
+        smallArray = [sortedArray subarrayWithRange:NSMakeRange(0, numStops)];
+    }
+    
+    NSMutableArray *stops = [[NSMutableArray alloc] init];
+    
+    //aplicamos graphhopper solo para esa array
+    for (PoiDistance *v in smallArray) {
+        
+        double distWalk = [_ug getDistancePois:latitude :longitude :[v getLatitude] :[v getLongitude]];
+        [v setDistance:distWalk];
+        [stops addObject:v];
+    }
+
+    //ordenar la nueva lista
+    NSArray *stopsOrder = [stops sortedArrayUsingDescriptors:descriptors];
+    NSArray *smallStopArray = [stopsOrder subarrayWithRange:NSMakeRange(0, numStops)];
+    
+    // devolvemos solo los numStops primeros en una array de NSString
+    NSMutableArray *array = [[NSMutableArray alloc] initWithArray:smallStopArray];
+    
+    return array;
+
 }
 
 @end
