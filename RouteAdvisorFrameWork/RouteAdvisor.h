@@ -154,6 +154,7 @@
     <li><b> rating: </b>Valoració del punt</li>
     <li><b> title: </b>Descripció del punt</li>
     <li><b> subtitle: </b>Informació extra del punt</li>
+    <li><b> type: </b> Indicar el tipus de punt d'interès 0-->POI 1-->STOP</li>
  </ul>
  */
 @interface POI : NSObject
@@ -172,6 +173,7 @@
     long rating;
     NSString *title;
     NSString *subtitle;
+    long type;
 }
 
 /*!
@@ -242,6 +244,14 @@
  @discussion Guarda el POI més proper a aquest
  */
 -(void) setClosestPoi:(long) closestPoi;
+
+/*!
+ @method getClosestPoi
+ @discussion proporciona el POI més proper a aquest
+ @result long
+ */
+-(long)getClosestPoi;
+
 /*!
  @method isVisited
  @discussion Guarda si ha estat visitat o no el POI
@@ -274,7 +284,17 @@
  @result NSString
  */
 -(NSString *)getSubtitle;
-
+/*!
+ @method setType
+ @discussion guarda el tipus de punt d'interès 0-->POI 1-->STOP
+ */
+-(void) setType:(long) t;
+/*!
+ @method getType
+ @discussion proporciona el tipus de punt d'interès 0-->POI 1-->STOP
+ @result long
+ */
+-(long) getType;
 @end
 
 /*!
@@ -284,6 +304,7 @@
  <li><b> idPOI: </b>Identificador del punt d’interès. Obligatori</li>
  <li><b> closest_poi: </b>POI més proper a aquest</li>
  <li><b> visited: </b> Indicar si ha estat visitat o no, ús per càlcul de rutes dinàmiques</li>
+ <li><b> type: </b> Indicar el tipus de punt d'interès 0-->POI 1-->STOP</li>
  </ul>
  */
 @interface POISimple : NSObject
@@ -291,6 +312,7 @@
     NSString *idPOI;
     long closest_poi;
     BOOL visited;
+    long type;
 }
 
 /*!
@@ -314,6 +336,19 @@
  @discussion Guarda si ha estat visitat o no el POI
  */
 -(void) isVisited:(BOOL) vis;
+/*!
+@method setType
+@discussion guarda el tipus de punt d'interès 0-->POI 1-->STOP
+*/
+-(void) setType:(long) t;
+/*!
+ @method getType
+ @discussion proporciona el tipus de punt d'interès 0-->POI 1-->STOP
+ @result long
+ */
+-(long) getType;
+
+
 @end
 
 /*!
@@ -642,8 +677,7 @@
  @param longitudeEnd longitud del punt d’interès destí
  @param days número de dies per la visita. El valor ha de ser entre 1 i 5
  @param rate ritme que vol per les visites. El valor ha de ser entre 1 i 3
- @result NSMutableArray<NSString>
- @warning Exemple de resultat:[123-12-14-15,456-453-345-234,876-756-444]
+ @result NSMutableArray<NSMutableArray<PoiSimple>>
  */
 -(NSMutableArray *) getDinamicRoutes :(double)scoreMuseum
                                     :(double) scoreArchitecture
@@ -695,7 +729,7 @@
  @param longitudeEnd longitud del punt d’interès destí
  @result double
  */
-- (double) getDistancePois:(double)latitudeIni :(double)longitudeIni :(double)latitudeEnd :(double)longitudeEnd;
+- (double) gestDistanceCoordinates:(double)latitudeIni :(double)longitudeIni :(double)latitudeEnd :(double)longitudeEnd;
 
 
 /*!

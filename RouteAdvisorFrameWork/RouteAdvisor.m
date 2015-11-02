@@ -162,6 +162,15 @@
     -(NSString *)getSubtitle{
         return subtitle;
     }
+    -(long) getClosestPoi{
+        return closest_poi;
+    }
+    -(long) getType{
+        return type;
+    }
+    -(void) setType:(long )t{
+        type = t;
+    }
 @end
 
 @implementation POISimple
@@ -179,6 +188,14 @@
 }
 -(void) isVisited:(BOOL) vis {
     visited = vis;
+}
+
+-(long) getType{
+    return type;
+}
+
+-(void) setType:(long )t{
+    type = t;
 }
 
 @end
@@ -346,6 +363,7 @@
 #define RELAXED_SPEED ((double) 50)
 
 #define DEFAULT_DOUBLE_VALUE ((double) 0.0)
+#define MINIM_DOUBLE_VALUE ((double) 0.01)
 
 #define TOPIC_RESTAURANT ((int) 6)
 #define TOPIC_MUSEUM ((int) 2)
@@ -443,7 +461,7 @@
     return allRoute;
 }
 
--(NSMutableArray *) getAllIdsPOIFixRoute:(long) idRoute{
+-(NSMutableArray *) getAllIdsPOIFixRoute:(long) idRouteFind{
     
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
@@ -461,55 +479,60 @@
     STSSession *sess = [db createSession];
     STSGraph *graph = [sess getGraph];
     
-    NSMutableArray *allPOI = [[NSMutableArray alloc] init];
+    STSValue *v = [[STSValue alloc] init];
     
     int fixRouteType = [graph findType: TYPE_FIXROUTE];
+    int idFixRoute = [graph findAttribute:fixRouteType name:TYPE_ID];
+    long long fixroute= [graph findObject:idFixRoute value: [v setLong:idRouteFind]];
+    
+    NSString *orderPois = [[NSString alloc] init];
+    [graph getAttributeInValue: fixroute attr: [graph findAttribute:fixRouteType name:TYPE_POI_ORDER] value: v];
+    if (!v.isNull){
+        orderPois = [v getString];
+    }
+    
+    NSMutableArray *fixRouteNotOrder = [[NSMutableArray alloc] init];
+
     int poiType = [graph findType: TYPE_POI];
+    int stopType = [graph findType: TYPE_STOP];
     int routeNameId = [graph findAttribute: fixRouteType name: TYPE_ID];
     STSValue *val = [[STSValue alloc] init];
-    STSObjects *nodeFixRoute = [graph selectWithAttrValue: routeNameId cond: STSEqual value: [val setLong:(idRoute)]];
-    int edgeType = [graph findType: TYPE_POI_FIXROUTE];
+    STSObjects *nodeFixRoute = [graph selectWithAttrValue: routeNameId cond: STSEqual value: [val setLong:(idRouteFind)]];
+    int edgePoiType = [graph findType: TYPE_POI_FIXROUTE];
+    int edgeStopType = [graph findType: TYPE_STOP_FIXROUTE];
     STSObjectsIterator *itr = [nodeFixRoute iterator];
-    
     
     while ([itr hasNext])
     {
         long long fixRouteOid = [itr next];
         
-        STSObjects *pois = [graph neighbors: fixRouteOid etype: edgeType dir: STSAny];
-        STSValue *v = [[STSValue alloc] init];
+        STSObjects *pois = [graph neighbors: fixRouteOid etype: edgePoiType dir: STSAny];
         
         STSObjectsIterator *it = [pois iterator];
         //get all POI type poi
         while ([it hasNext])
         {
             long long poi = [it next];
-            POISimple *p = [[POISimple alloc] init];
+            POI *p = [[POI alloc] init];
             [graph getAttributeInValue: poi attr: [graph findAttribute:poiType name:TYPE_ID] value: v];
             if (!v.isNull){
-                [p setIdPOI:[NSString stringWithFormat:@"%lld", [v getLong]]];
+                [p setIdPOI:[v stringValue]];
             }
+            
             [graph getAttributeInValue: poi attr: [graph findAttribute:poiType name:TYPE_CLOSEST_POI] value: v];
             if (!v.isNull){
                 [p setClosestPoi:[v getLong]];
             }
-            [graph getAttributeInValue: poi attr: [graph findAttribute:poiType name:TYPE_VISITED] value: v];
-            if (!v.isNull){
-                [p isVisited:[v getBoolean]];
-            }
-            [allPOI addObject: p];
+            
+            [fixRouteNotOrder addObject: p];
         }
         
         [it close];
         [pois close];
         
-        int stopType = [graph findType: TYPE_STOP];
-        int edgeStopType = [graph findType: TYPE_STOP_FIXROUTE];
-        
         STSObjects *stops = [graph neighbors: fixRouteOid etype: edgeStopType dir: STSAny];
         
         STSObjectsIterator *itStops = [stops iterator];
-        
         //get all POI type STOPS
         while ([itStops hasNext])
         {
@@ -519,15 +542,7 @@
             if (!v.isNull){
                 [p setIdPOI:[v stringValue]];
             }
-            [graph getAttributeInValue: stop attr: [graph findAttribute:stopType name:TYPE_LAT] value: v];
-            [p setLatitude:[v getDouble]];
-            [graph getAttributeInValue: stop attr: [graph findAttribute:stopType name:TYPE_LNG] value: v];
-            [p setLongitude:[v getDouble]];
-            [graph getAttributeInValue: stop attr: [graph findAttribute:stopType name:TYPE_DESCRIPTION] value: v];
-            if (!v.isNull){
-                [p setTitle:[v getString]];
-            }
-            [allPOI addObject: p];
+            [fixRouteNotOrder addObject: p];
         }
         
         [itStops close];
@@ -538,17 +553,37 @@
     [itr close];
     [nodeFixRoute close];
     
+    NSMutableArray *fixRoute = [[NSMutableArray alloc]init];
+    NSArray *arrayOrder = [orderPois componentsSeparatedByString:@"-"];
+    
+    for (NSString* idN in arrayOrder) {
+        for (POI* rou in fixRouteNotOrder) {
+            if ([idN isEqualToString: [rou getIdPOI]]){
+                POISimple *ps = [[POISimple alloc] init];
+                [ps setIdPOI:[rou getIdPOI]];
+                [ps setClosestPoi:[rou getClosestPoi]];
+                [ps isVisited:false];
+                if ([[rou getIdPOI] hasPrefix:@"S"]) {
+                    [ps setType:1];
+                }else{
+                    [ps setType:0];
+                }
+                
+                [fixRoute addObject:ps];
+            }
+        }
+    }
+
     [sess close];
     [db close];
     [sparksee close];
     
     //retun all POI (with type poi and type stops)
-    return allPOI;
+    return fixRoute;
 }
 
-
 -(NSMutableArray *) getAllPOIFixRoute:(long) idRoute{
-
+    
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
     
@@ -646,10 +681,10 @@
         
         
         STSObjects *stops = [graph neighbors: fixRouteOid etype: edgeStopType dir: STSAny];
-        STSValue *val = [[STSValue alloc] init];
+       // STSValue *val = [[STSValue alloc] init];
         
         STSObjectsIterator *itStops = [stops iterator];
-         //get all POI type STOPS
+        //get all POI type STOPS
         while ([itStops hasNext])
         {
             long long stop = [itStops next];
@@ -683,7 +718,6 @@
     //retun all POI (with type poi and type stops)
     return allPOI;
 }
-
 
 
 -(NSMutableArray *) getAllPOIDinamicRoute:(double)scoreMuseum
@@ -722,6 +756,15 @@
             break;
     }
     
+    if (scoreMuseum == DEFAULT_DOUBLE_VALUE && scoreArchitecture == DEFAULT_DOUBLE_VALUE && scoreArt==DEFAULT_DOUBLE_VALUE && scoreLeisure==DEFAULT_DOUBLE_VALUE && scoreShooping==DEFAULT_DOUBLE_VALUE) {
+        
+        scoreMuseum = MINIM_DOUBLE_VALUE;
+        scoreArchitecture = MINIM_DOUBLE_VALUE;
+        scoreArt = MINIM_DOUBLE_VALUE;
+        scoreLeisure = MINIM_DOUBLE_VALUE;
+        scoreShooping = MINIM_DOUBLE_VALUE;
+        
+    }
     
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
@@ -847,13 +890,13 @@
 
     //transform each rute in a string with all idPois separated by "-"
     for (NSMutableArray *d in routes) {
-        NSString *result = [[NSString alloc] init ];
-
+        NSMutableArray *result = [[NSMutableArray alloc] init ];
+        
         for (int i=1; i< [d count]-1; i++) {
-            result = [result stringByAppendingString:[d objectAtIndex:i]];
-            if (i<[d count]-2) {
-                result = [result stringByAppendingString:@"-"];
-            }
+            POISimple *p = [[POISimple alloc] init];
+            [p setIdPOI:[d objectAtIndex:i]];
+            [p setType:0];
+            [result addObject:p];
         }
         [dinamicRoutes addObject:result];
     }
@@ -925,15 +968,13 @@
 }
 
 //distancia between two poids
-- (double) getDistancePois:(double)latitudeIni
+- (double) gestDistanceCoordinates:(double)latitudeIni
                           :(double)longitudeIni
                           :(double)latitudeEnd
                           :(double)longitudeEnd
 {
-    NSLog(@" STEP 1000 %ff, %ff, %ff, %ff ",latitudeIni,longitudeIni,latitudeEnd,longitudeEnd);
     double lolo = 0.1;
     lolo = [_ug getDistancePois:latitudeIni :longitudeIni : latitudeEnd :longitudeEnd];
-    NSLog(@" STEP 1001 %ff ",lolo);
     return lolo;
 }
 
