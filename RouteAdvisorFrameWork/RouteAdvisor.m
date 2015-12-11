@@ -463,6 +463,7 @@
 
 -(NSMutableArray *) getAllIdsPOIFixRoute:(long) idRouteFind{
     
+   // NSLog(@"Start getNodesFixRoute 00");
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *destinationFolder = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
     
@@ -490,7 +491,7 @@
     if (!v.isNull){
         orderPois = [v getString];
     }
-    
+    // NSLog(@"Start getNodesFixRoute 01");
     NSMutableArray *fixRouteNotOrder = [[NSMutableArray alloc] init];
 
     int poiType = [graph findType: TYPE_POI];
@@ -505,7 +506,7 @@
     while ([itr hasNext])
     {
         long long fixRouteOid = [itr next];
-        
+         //NSLog(@"Start getNodesFixRoute 02");
         STSObjects *pois = [graph neighbors: fixRouteOid etype: edgePoiType dir: STSAny];
         
         STSObjectsIterator *it = [pois iterator];
@@ -529,7 +530,7 @@
         
         [it close];
         [pois close];
-        
+         //NSLog(@"Start getNodesFixRoute 03");
         STSObjects *stops = [graph neighbors: fixRouteOid etype: edgeStopType dir: STSAny];
         
         STSObjectsIterator *itStops = [stops iterator];
@@ -552,7 +553,7 @@
     
     [itr close];
     [nodeFixRoute close];
-    
+    // NSLog(@"Start getNodesFixRoute 04");
     NSMutableArray *fixRoute = [[NSMutableArray alloc]init];
     NSArray *arrayOrder = [orderPois componentsSeparatedByString:@"-"];
     
@@ -577,7 +578,7 @@
     [sess close];
     [db close];
     [sparksee close];
-    
+     //NSLog(@"End getNodesFixRoute 05");
     //retun all POI (with type poi and type stops)
     return fixRoute;
 }

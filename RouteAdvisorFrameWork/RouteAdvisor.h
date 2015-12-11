@@ -2,8 +2,9 @@
 //  RouteAdvisor.h
 //  RouteAdvisor
 //
-//  Created by cbalufo on 29/4/15.
+//  Created by dama-upc on 01/12/15.
 //  Copyright (c) 2015 DAMA-UPC. All rights reserved.
+//  version 1.1.1
 //
 #import <Foundation/Foundation.h>
 
